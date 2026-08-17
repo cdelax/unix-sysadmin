@@ -1,0 +1,35 @@
+[[servers]]
+host = "10.x.x.x"
+port = 389
+use_ssl = false
+start_tls = true
+ssl_skip_verify = true
+# root_ca_cert = "/etc/grafana/ipa-ca.crt"
+
+bind_dn = "uid=daniel,cn=users,cn=accounts,dc=delax,dc=com"
+bind_password = "test1234"
+
+search_filter = "(uid=%s)"
+search_base_dns = ["cn=users,cn=accounts,dc=delax,dc=com"]
+
+group_search_base_dns = ["cn=groups,cn=accounts,dc=delax,dc=com"]
+
+[servers.attributes]
+name = "givenName"
+surname = "sn"
+username = "uid"
+member_of = "memberOf"
+email = "mail"
+
+[[servers.group_mappings]]
+group_dn = "cn=grafana-admins,cn=groups,cn=accounts,dc=delax,dc=com"
+org_role = "Admin"
+grafana_admin = true
+
+[[servers.group_mappings]]
+group_dn = "cn=grafana-editors,cn=groups,cn=accounts,dc=delax,dc=com"
+org_role = "Editor"
+
+[[servers.group_mappings]]
+group_dn = "*"
+org_role = "Viewer"

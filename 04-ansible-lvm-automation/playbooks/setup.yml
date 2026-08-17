@@ -1,0 +1,115 @@
+- name: Playbook
+  hosts: localhost # localhost, all (all hosts), webservers
+  become: yes # executes as root
+  gather_facts: yes
+
+  vars: # variables
+    sname: "daniel"
+    vg_name: "{{ sname }}_test"
+    mount_point: "/mnt/{{ sname }}"
+
+  tasks: # List of actions to execute in order
+    - name: Create Volume Group
+      community.general.lvg: # modules
+        vg: "{{ vg_name }}"
+        pvs:
+          - /dev/sdb
+          - /dev/sdc
+        state: present
+
+    - name: Create lv1 with 2GB
+      community.general.lvol:
+        vg: "{{ vg_name }}"
+        lv: lv1
+        size: 2g
+        state: present
+
+    - name: Create lv2 with 1.5GB
+      community.general.lvol:
+        vg: "{{ vg_name }}"
+        lv: lv2
+        size: 1.5g
+        state: present
+
+    - name: Create lv3 with 200 mb initially
+      community.general.lvol:
+        vg: "{{ vg_name }}"
+        lv: lv3
+        size: 100%FREE
+        resizefs: yes
+        state: present # it ensures it exists
+        force: true
+
+    - name: Create filesystem for lv1
+      community.general.filesystem:
+        fstype: ext4
+        dev: "/dev/{{ vg_name }}/lv1"
+
+    - name: Mount lv1
+      ansible.posix.mount:
+        path: "{{ mount_point }}/lv1"
+        src: "/dev/{{ vg_name }}/lv1"
+        fstype: ext4
+        state: mounted
+
+    - name: Create filesystem for lv2
+      community.general.filesystem:
+        fstype: xfs
+        dev: "/dev/{{ vg_name }}/lv2"
+
+    - name: Mount lv2
+      ansible.posix.mount:
+        path: "{{ mount_point }}/lv2"
+        src: "/dev/{{ vg_name }}/lv2"
+        fstype: xfs
+        state: mounted
+
+    - name: Create filesystem for lv3
+      community.general.filesystem:
+        fstype: ext4
+        dev: "/dev/{{ vg_name }}/lv3"
+
+    - name: Mount lv3
+      ansible.posix.mount:
+        path: "{{ mount_point }}/lv3"
+        src: "/dev/{{ vg_name }}/lv3"
+        fstype: ext4
+        state: mounted
+
+    - name: Resize
+      community.general.lvol:
+        vg: "{{ vg_name }}"
+        lv: lv3
+        size: 100%FREE
+        resizefs: no
+        state: present
+
+    - name: Create swap
+      community.general.filesystem:
+        fstype: swap
+        dev: /dev/sdd
+
+    - name: Activate swap
+      ansible.builtin.command: swapon -a
+      changed_when: false
+
+    - name: Add swap
+      ansible.posix.mount:
+        path: none
+        src: /dev/sdd
+        fstype: swap
+        opts: defaults
+        state: present
+
+  post_tasks:
+    - name: show final status
+      ansible.builtin.shell:
+        "vgdisplay {{ vg_name }}
+        && lvs {{ vg_name }}
+        && mount | grep {{ sname }}"
+      register: result
+      changed_when: false
+
+    - name: Display result
+      ansible.builtin.debug:
+        var: result.stdout_lines

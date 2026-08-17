@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: grafana/grafana:11.5.2   # Pin a recent stable version
+    container_name: grafana-ldap
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "3000:3000"
+    environment:
+      # Local admin bootstrap (use once, then prefer LDAP)
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password123
+      - GF_AUTH_LDAP_SKIP_ORG_ROLE_SYNC=true
+
+      # LDAP Authentication
+      - GF_AUTH_LDAP_ENABLED=true
+      - GF_AUTH_LDAP_CONFIG_FILE=/etc/grafana/ldap.toml
+      - GF_AUTH_LDAP_ALLOW_SIGN_UP=true          # Auto-provision LDAP users
+      - GF_USERS_ALLOW_SIGN_UP=false             # Disable local anonymous signup
+
+      # Logging (set to debug during initial validation)
+      - GF_LOG_LEVEL=info
+      # - GF_LOG_LEVEL=debug
+      # - GF_LOG_FILTERS=ldap:debug
+
+      # Optional hardening
+      - GF_SERVER_ROOT_URL=http://10.x.x.x:3000
+    volumes:
+      - /opt/grafana/data:/var/lib/grafana
+      - /opt/grafana/ldap.toml:/etc/grafana/ldap.toml:ro

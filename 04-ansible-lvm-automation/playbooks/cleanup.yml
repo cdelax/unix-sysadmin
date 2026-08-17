@@ -1,0 +1,83 @@
+- name: Cleanup for playbook
+  hosts: localhost
+  become: yes
+  gather_facts: yes
+
+  vars:
+    sname: "daniel"
+    vg_name: "{{ sname }}_test"
+    mount_point: "/mnt/{{ sname }}"
+
+  tasks:
+    - name: Umount lv's
+      ansible.posix.mount:
+        path: "{{ mount_point }}/{{ item }}"
+        state: unmounted
+      loop:
+        - lv1
+        - lv2
+        - lv3
+
+    - name: Remove mnts from /etc/fstab
+      ansible.posix.mount:
+        path: "{{ mount_point }}/{{ item }}"
+        state: absent
+      loop:
+        - lv1
+        - lv2
+        - lv3
+
+    - name: Disable swap
+      ansible.builtin.command: swapoff /dev/sdd
+      ignore_errors: yes
+
+    - name: Remove swap
+      ansible.posix.mount:
+        path: none
+        src: /dev/sdd
+        fstype: swap
+        state: absent
+
+    - name: Rm lv's
+      community.general.lvol:
+        vg: "{{ vg_name }}"
+        lv: "{{ item }}"
+        state: absent
+        force: yes
+      loop:
+        - lv1
+        - lv2
+        - lv3
+
+    - name: Remove vg
+      community.general.lvg:
+        vg: "{{ vg_name }}"
+        state: absent
+        force: yes
+
+    - name: Remove pv
+      ansible.builtin.command: pvremove -y {{ item }}
+      loop:
+        - /dev/sdb
+        - /dev/sdc
+      ignore_errors: yes
+
+    - name: Remove mount dirs
+      ansible.builtin.file:
+        path: "{{ mount_point }}"
+        state: absent
+
+  post_tasks:
+    - name: show final status
+      ansible.builtin.shell: |
+        lvs || true
+        vgs || true
+        pvs || true
+        mount | grep {{ sname }} || true
+        swapon --show || true
+      register: result
+      changed_when: false
+
+    - name: Display result
+      ansible.builtin.debug:
+        var: result.stdout_lines
